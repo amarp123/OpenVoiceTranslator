@@ -71,7 +71,7 @@ translateButton.addEventListener('click', async () => {
   }
 
   try {
-    const response = await fetch('https://open-voice-translator.vercel.app/translate', {
+    const response = await fetch('https://open-voice-translator.vercel.app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: textToTranslate, fromLanguage, toLanguage, mode })
