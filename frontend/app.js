@@ -21,24 +21,28 @@ darkModeButton.addEventListener('click', () => {
 
 // Start Speech Recognition
 startButton.addEventListener('click', () => {
-  console.log('Start Speaking button clicked');
   const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
   if (!recognition) {
-    console.error('Speech recognition not supported');
+    console.error('Speech recognition not supported on this browser.');
+    giveVoiceFeedback('Sorry, your browser does not support speech recognition.');
     return;
   }
   recognition.lang = inputLanguageSelect.value;
   recognition.start();
+
   recognition.onstart = () => {
-    console.log('Speech recognition started');
+    console.log('Speech recognition started...');
   };
+
   recognition.onresult = (event) => {
     const spokenText = event.results[0][0].transcript;
-    console.log('Speech recognition result:', spokenText);
     output.textContent = spokenText;
+    console.log('Recognized:', spokenText);
   };
+
   recognition.onerror = (event) => {
     console.error('Speech recognition error:', event.error);
+    giveVoiceFeedback('Speech recognition error occurred.');
   };
 });
 
@@ -50,65 +54,52 @@ function giveVoiceFeedback(message) {
 
 // Translate Text
 translateButton.addEventListener('click', async () => {
-  const textToTranslate = output.textContent;
+  const textToTranslate = output.textContent.trim();
   const fromLanguage = inputLanguageSelect.value.split('-')[0];
   const toLanguage = outputLanguageSelect.value;
   let mode = document.getElementById('translation-mode').value;
 
-  if (!navigator.onLine) {
-    mode = 'offline';
-    console.warn('No internet connection detected. Switching to offline mode.');
-  }
-
-  console.log(`Text to Translate: ${textToTranslate}`);
-  console.log(`From Language: ${fromLanguage}`);
-  console.log(`To Language: ${toLanguage}`);
-  console.log(`Mode: ${mode}`);
-
   if (!textToTranslate || !fromLanguage || !toLanguage || !mode) {
-    console.error('Required input is missing');
+    giveVoiceFeedback('Please enter text and select languages.');
     return;
   }
 
+  if (!navigator.onLine) {
+    mode = 'offline';
+    console.warn('No internet connection. Using offline mode.');
+  }
+
   try {
-    const response = await fetch('https://open-voice-translator.vercel.app', {
+    const response = await fetch('https://open-voice-translator.vercel.app/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: textToTranslate, fromLanguage, toLanguage, mode })
     });
 
-    if (response.ok) {
-      const result = await response.json();
-      console.log(`Translated Text: ${result.translated_text}`);
-      translatedOutput.textContent = result.translated_text;
-      saveToHistory(textToTranslate, result.translated_text);
-      giveVoiceFeedback(`Translation completed. The translated text is ${result.translated_text}`);
-    } else {
-      console.error(`Translation failed: ${response.statusText}`);
-      giveVoiceFeedback('Translation failed. Please try again.');
-    }
+    if (!response.ok) throw new Error('Translation failed');
+
+    const result = await response.json();
+    translatedOutput.textContent = result.translated_text;
+    saveToHistory(textToTranslate, result.translated_text);
+    giveVoiceFeedback(`Translated: ${result.translated_text}`);
   } catch (error) {
-    console.warn('Online mode failed. Trying offline mode...');
+    console.warn('Primary translation failed, trying offline fallback...');
     try {
-      const fallbackResponse = await fetch('https://open-voice-translator.vercel.app', {
+      const fallbackResponse = await fetch('https://open-voice-translator.vercel.app/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: textToTranslate, fromLanguage, toLanguage, mode: 'offline' })
       });
 
-      if (fallbackResponse.ok) {
-        const result = await fallbackResponse.json();
-        console.log(`Translated Text: ${result.translated_text}`);
-        translatedOutput.textContent = result.translated_text;
-        saveToHistory(textToTranslate, result.translated_text);
-        giveVoiceFeedback(`Translation completed. The translated text is ${result.translated_text}`);
-      } else {
-        console.error(`Offline translation failed: ${fallbackResponse.statusText}`);
-        giveVoiceFeedback('Offline translation failed. Please try again.');
-      }
+      if (!fallbackResponse.ok) throw new Error('Offline fallback also failed');
+
+      const fallbackResult = await fallbackResponse.json();
+      translatedOutput.textContent = fallbackResult.translated_text;
+      saveToHistory(textToTranslate, fallbackResult.translated_text);
+      giveVoiceFeedback(`Offline translation: ${fallbackResult.translated_text}`);
     } catch (retryError) {
-      console.error('Both online and offline modes failed:', retryError);
-      giveVoiceFeedback('An error occurred. Please try again.');
+      console.error('Both online and offline translation failed.');
+      giveVoiceFeedback('Sorry, translation failed. Please try again.');
     }
   }
 });
@@ -124,11 +115,17 @@ function saveToHistory(originalText, translatedText) {
 viewHistoryButton.addEventListener('click', () => {
   const history = JSON.parse(localStorage.getItem('translationHistory')) || [];
   historyList.innerHTML = '';
-  history.forEach(item => {
-    const listItem = document.createElement('li');
-    listItem.textContent = `Original: ${item.original}, Translated: ${item.translated}`;
-    historyList.appendChild(listItem);
-  });
+  if (history.length === 0) {
+    const emptyMsg = document.createElement('li');
+    emptyMsg.textContent = 'No history yet.';
+    historyList.appendChild(emptyMsg);
+  } else {
+    history.forEach(item => {
+      const listItem = document.createElement('li');
+      listItem.textContent = `Original: ${item.original} → Translated: ${item.translated}`;
+      historyList.appendChild(listItem);
+    });
+  }
   historySection.style.display = 'block';
 });
 
@@ -136,5 +133,5 @@ viewHistoryButton.addEventListener('click', () => {
 clearHistoryButton.addEventListener('click', () => {
   localStorage.removeItem('translationHistory');
   historyList.innerHTML = '';
-  giveVoiceFeedback('Translation history has been cleared.');
+  giveVoiceFeedback('Translation history cleared.');
 });
