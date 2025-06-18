@@ -5,71 +5,62 @@ const axios = require('axios');
 
 const app = express();
 
-// ✅ Define allowed origins (for production and development)
+// ✅ Allow Firebase & localhost frontend
 const allowedOrigins = [
-  'https://openvoice-92569.web.app', // Firebase hosted frontend
-  'http://localhost:3000'            // Local dev frontend
+  'https://openvoice-92569.web.app', // Firebase
+  'http://localhost:3000'            // Dev
 ];
 
-// ✅ Use custom CORS configuration
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('CORS policy: Not allowed by CORS'));
+      callback(new Error('Not allowed by CORS'));
     }
-  }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
 }));
 
-// Middleware for parsing JSON bodies
 app.use(bodyParser.json());
 
-// ✅ Translation endpoint
+// ✅ Handle preflight requests explicitly
+app.options('*', cors());
+
+// ✅ Translation route
 app.post('/translate', async (req, res) => {
   const { text, fromLanguage, toLanguage, mode } = req.body;
-  console.log('Incoming translation request:', req.body);
+  console.log('Request:', req.body);
 
-  // Validate input
   if (!text || !fromLanguage || !toLanguage || !mode) {
-    return res.status(400).json({
-      error: 'Text, fromLanguage, toLanguage, or mode is missing'
-    });
+    return res.status(400).json({ error: 'Missing input fields' });
   }
 
   try {
-    // Call LibreTranslate API
     const response = await axios.post('https://libretranslate.de/translate', {
       q: text,
       source: fromLanguage,
       target: toLanguage,
       format: 'text'
     }, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      headers: { 'Content-Type': 'application/json' }
     });
 
     const translatedText = response.data.translatedText;
-    console.log('Translated Text:', translatedText);
+    console.log('Translated:', translatedText);
 
     res.json({ translated_text: translatedText });
 
-  } catch (error) {
-    console.error('Translation failed:', error.message);
-    res.status(500).json({
-      error: 'Translation failed',
-      details: error.message
-    });
+  } catch (err) {
+    console.error('Translation Error:', err.message);
+    res.status(500).json({ error: 'Translation failed', details: err.message });
   }
 });
 
-// ✅ Health check route
+// ✅ Health check
 app.get('/', (req, res) => {
-  res.send({
-    activeStatus: true,
-    error: false
-  });
+  res.send({ status: 'Backend live', error: false });
 });
 
 // ✅ Start server
