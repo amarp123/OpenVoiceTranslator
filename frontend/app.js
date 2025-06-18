@@ -90,7 +90,7 @@ translateButton.addEventListener('click', async () => {
   } catch (error) {
     console.warn('Online mode failed. Trying offline mode...');
     try {
-      const fallbackResponse = await fetch('https://open-voice-translator.vercel.app/translate', {
+      const fallbackResponse = await fetch('https://open-voice-translator.vercel.app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: textToTranslate, fromLanguage, toLanguage, mode: 'offline' })
