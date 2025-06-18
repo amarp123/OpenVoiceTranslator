@@ -4,7 +4,21 @@ const cors = require('cors');
 const axios = require('axios');
 
 const app = express();
-app.use(cors());
+
+// ✅ Define allowed origins (you can add localhost for development too)
+const allowedOrigins = ['https://openvoice-92569.web.app', 'http://localhost:3000'];
+
+// ✅ Use CORS with custom origin check
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy: Not allowed by CORS'));
+    }
+  }
+}));
+
 app.use(bodyParser.json());
 
 app.post('/translate', async (req, res) => {
