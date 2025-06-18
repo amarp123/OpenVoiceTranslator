@@ -15,15 +15,9 @@ document.body.classList.add('light-mode');
 
 // Toggle Dark Mode
 darkModeButton.addEventListener('click', () => {
-  if (document.body.classList.contains('light-mode')) {
-    document.body.classList.remove('light-mode');
-    document.body.classList.add('dark-mode');
-  } else {
-    document.body.classList.remove('dark-mode');
-    document.body.classList.add('light-mode');
-  }
+  document.body.classList.toggle('light-mode');
+  document.body.classList.toggle('dark-mode');
 });
-
 
 // Start Speech Recognition
 startButton.addEventListener('click', () => {
@@ -48,7 +42,7 @@ startButton.addEventListener('click', () => {
   };
 });
 
-// Function for Voice Feedback
+// Voice Feedback
 function giveVoiceFeedback(message) {
   const utterance = new SpeechSynthesisUtterance(message);
   window.speechSynthesis.speak(utterance);
@@ -57,11 +51,10 @@ function giveVoiceFeedback(message) {
 // Translate Text
 translateButton.addEventListener('click', async () => {
   const textToTranslate = output.textContent;
-  const fromLanguage = inputLanguageSelect.value.split('-')[0]; // Extract standard language code
+  const fromLanguage = inputLanguageSelect.value.split('-')[0];
   const toLanguage = outputLanguageSelect.value;
   let mode = document.getElementById('translation-mode').value;
-  
-  // Check for network connectivity
+
   if (!navigator.onLine) {
     mode = 'offline';
     console.warn('No internet connection detected. Switching to offline mode.');
@@ -71,19 +64,19 @@ translateButton.addEventListener('click', async () => {
   console.log(`From Language: ${fromLanguage}`);
   console.log(`To Language: ${toLanguage}`);
   console.log(`Mode: ${mode}`);
-  
+
   if (!textToTranslate || !fromLanguage || !toLanguage || !mode) {
-    console.error('Text to translate, from language, to language, or mode is missing');
+    console.error('Required input is missing');
     return;
   }
 
   try {
-    const response = await fetch('http://localhost:3001/translate', {
+    const response = await fetch('https://open-voice-translator.vercel.app/translate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: textToTranslate, fromLanguage: fromLanguage, toLanguage: toLanguage, mode: mode })
+      body: JSON.stringify({ text: textToTranslate, fromLanguage, toLanguage, mode })
     });
-    
+
     if (response.ok) {
       const result = await response.json();
       console.log(`Translated Text: ${result.translated_text}`);
@@ -95,42 +88,30 @@ translateButton.addEventListener('click', async () => {
       giveVoiceFeedback('Translation failed. Please try again.');
     }
   } catch (error) {
-    if (mode === 'online') {
-      console.warn('Network request failed. Trying offline mode.');
-      // Retry with offline mode if online mode fails
-      mode = 'offline';
-      try {
-        const response = await fetch('http://localhost:3001/translate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: textToTranslate, fromLanguage: fromLanguage, toLanguage: toLanguage, mode: mode })
-        });
+    console.warn('Online mode failed. Trying offline mode...');
+    try {
+      const fallbackResponse = await fetch('https://open-voice-translator.vercel.app/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToTranslate, fromLanguage, toLanguage, mode: 'offline' })
+      });
 
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`Translated Text: ${result.translated_text}`);
-          translatedOutput.textContent = result.translated_text;
-          saveToHistory(textToTranslate, result.translated_text);
-          giveVoiceFeedback(`Translation completed. The translated text is ${result.translated_text}`);
-        } else {
-          console.error(`Translation failed: ${response.statusText}`);
-          giveVoiceFeedback('Translation failed. Please try again.');
-        }
-      } catch (retryError) {
-        console.error('Offline mode also failed:', retryError);
-        giveVoiceFeedback('An error occurred. Please try again.');
+      if (fallbackResponse.ok) {
+        const result = await fallbackResponse.json();
+        console.log(`Translated Text: ${result.translated_text}`);
+        translatedOutput.textContent = result.translated_text;
+        saveToHistory(textToTranslate, result.translated_text);
+        giveVoiceFeedback(`Translation completed. The translated text is ${result.translated_text}`);
+      } else {
+        console.error(`Offline translation failed: ${fallbackResponse.statusText}`);
+        giveVoiceFeedback('Offline translation failed. Please try again.');
       }
-    } else {
-      console.error('Error:', error);
+    } catch (retryError) {
+      console.error('Both online and offline modes failed:', retryError);
       giveVoiceFeedback('An error occurred. Please try again.');
     }
   }
 });
-
-
-
-
-
 
 // Save Translation to History
 function saveToHistory(originalText, translatedText) {
@@ -139,7 +120,7 @@ function saveToHistory(originalText, translatedText) {
   localStorage.setItem('translationHistory', JSON.stringify(history));
 }
 
-// Display Translation History
+// View Translation History
 viewHistoryButton.addEventListener('click', () => {
   const history = JSON.parse(localStorage.getItem('translationHistory')) || [];
   historyList.innerHTML = '';
@@ -151,16 +132,9 @@ viewHistoryButton.addEventListener('click', () => {
   historySection.style.display = 'block';
 });
 
-
-
 // Clear Translation History
 clearHistoryButton.addEventListener('click', () => {
   localStorage.removeItem('translationHistory');
   historyList.innerHTML = '';
   giveVoiceFeedback('Translation history has been cleared.');
 });
-
-
-
-
-
