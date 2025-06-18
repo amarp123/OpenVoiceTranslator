@@ -5,36 +5,37 @@ const axios = require('axios');
 
 const app = express();
 
-// ✅ Allow Firebase & localhost frontend
-const allowedOrigins = [
-  'https://openvoice-92569.web.app', // Firebase
-  'http://localhost:3000'            // Dev
-];
-
+// ✅ CORS Setup
+const allowedOrigins = ['https://openvoice-92569.web.app', 'http://localhost:3000'];
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error('CORS policy: Not allowed by CORS'));
     }
-  },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type']
+  }
 }));
 
 app.use(bodyParser.json());
 
-// ✅ Handle preflight requests explicitly
-app.options('*', cors());
+// ✅ Health check route
+app.get('/', (req, res) => {
+  res.send({ status: 'Server running', time: new Date().toISOString() });
+});
 
-// ✅ Translation route
+// ✅ Translation Endpoint
 app.post('/translate', async (req, res) => {
   const { text, fromLanguage, toLanguage, mode } = req.body;
-  console.log('Request:', req.body);
+  console.log('\n🟢 New Request Received');
+  console.log('Text:', text);
+  console.log('From:', fromLanguage);
+  console.log('To:', toLanguage);
+  console.log('Mode:', mode);
 
   if (!text || !fromLanguage || !toLanguage || !mode) {
-    return res.status(400).json({ error: 'Missing input fields' });
+    console.error('❌ Missing fields in request');
+    return res.status(400).json({ error: 'Missing required fields' });
   }
 
   try {
@@ -48,22 +49,19 @@ app.post('/translate', async (req, res) => {
     });
 
     const translatedText = response.data.translatedText;
-    console.log('Translated:', translatedText);
-
+    console.log('✅ Translation Success:', translatedText);
     res.json({ translated_text: translatedText });
 
-  } catch (err) {
-    console.error('Translation Error:', err.message);
-    res.status(500).json({ error: 'Translation failed', details: err.message });
+  } catch (error) {
+    console.error('❌ Translation Failed');
+    console.error(error.response?.data || error.message);
+    res.status(500).json({
+      error: 'Translation failed',
+      details: error.response?.data || error.message
+    });
   }
 });
 
-// ✅ Health check
-app.get('/', (req, res) => {
-  res.send({ status: 'Backend live', error: false });
-});
-
-// ✅ Start server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
